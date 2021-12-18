@@ -4,7 +4,7 @@ from django.db.models import indexes
 # Create your models here.
 
 class SearchResults(models.Model):
-    id = models.CharField(max_length=50)
+    ids = models.CharField(max_length=50)
     title = models.TextField()
     description = models.TextField()
     published_datetime = models.DateTimeField()
@@ -12,6 +12,6 @@ class SearchResults(models.Model):
 
     class Meta:
         indexes = [models.Index(fields=['published_datetime']),
-                   models.Index(fields=['id'])
+                   models.Index(fields=['ids'])
                   ]
 
