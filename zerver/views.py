@@ -6,6 +6,11 @@ from zerver.models import SearchResults
 
 
 def get_videos(request):
+    """Return JSON Response"""
+
+    if request.method != 'GET':
+        return JsonResponse({"details": "Method not allowed"}, status=405)
+
     videos = SearchResults.objects.all().order_by('-published_datetime')
     paginator = Paginator(videos, 50)
     page_no = int(request.GET.get('page') or '1')

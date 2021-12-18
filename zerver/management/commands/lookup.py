@@ -5,6 +5,7 @@ from time import sleep
 
 from django.core.management.base import BaseCommand
 from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
 
 from zerver.models import SearchResults
 
@@ -20,16 +21,19 @@ def lookup(query, result, published_time, page_token=None):
 
     youtube = build(YOUTUBE_API_SERVICE_NAME, YOUTUBE_API_VERSION, developerKey=DEVELOPER_KEY)
 
-    search = youtube.search().list(
-        q=query,
-        type='video',
-        order='date',
-        part='id,snippet',
-        publishedAfter=published_time,
-        pageToken=page_token,
-        maxResults=result
-    ).execute()
-    return search
+    try:
+        search = youtube.search().list(
+            q=query,
+            type='video',
+            order='date',
+            part='id,snippet',
+            publishedAfter=published_time,
+            pageToken=page_token,
+            maxResults=result
+        ).execute()
+        return search
+    except HttpError as e:
+        raise e
 
 def save_youtube_videos(new_video):
     """Save Youtube videos to database"""
@@ -57,33 +61,42 @@ class Command(BaseCommand):
 
         while True:
             
-            videos = SearchResults.objects.all().order_by('-published_datetime')
-            if videos.exists():
-                published_time = videos.first().published_datetime.replace(
-                    tzinfo=None)
-            else:
-                published_time = datetime.datetime.utcnow() - \
-                                  datetime.timedelta(minutes=30)
-
-            next_page = None
-            published_after_str = published_time.isoformat("T") + "Z"
-
-            while True:
-
-                new_videos = lookup('football',
-                                            50,
-                                            published_after_str,
-                                            next_page)
-
-                save_youtube_videos(new_videos)
-
-
-                if 'nextPageToken' in new_videos:
-                    next_page = new_videos['nextPageToken']
+            try:
+                videos = SearchResults.objects.all().order_by('-published_datetime')
+                if videos.exists():
+                    published_time = videos.first().published_datetime.replace(
+                        tzinfo=None)
                 else:
+                    published_time = datetime.datetime.utcnow() - \
+                                    datetime.timedelta(minutes=30)
+
+                next_page = None
+                published_after_str = published_time.isoformat("T") + "Z"
+
+                while True:
+
+                    new_videos = lookup('football',
+                                                50,
+                                                published_after_str,
+                                                next_page)
+
+                    save_youtube_videos(new_videos)
+
+
+                    if 'nextPageToken' in new_videos:
+                        next_page = new_videos['nextPageToken']
+                    else:
+                        break
+                self.stdout.write("Sync Completed successfully at {}".format(
+                    datetime.datetime.utcnow()
+                ))
+            except HttpError as e:
+                if e.resp['status'] == '403':
+                    self.stdout.write("API error")
                     break
-            self.stdout.write("Sync Completed successfully at {}".format(
-                datetime.datetime.utcnow()))
+                else:
+                    self.stderr.write("Error calling API")
+            finally:
 
             
-            sleep(SYNC_INTERVAL)
+                sleep(SYNC_INTERVAL)
