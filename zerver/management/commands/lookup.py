@@ -35,6 +35,12 @@ def save_youtube_videos(new_video):
     """Save Youtube videos to database"""
 
     for video in new_video['items']:
+
+        video_in_db = SearchResults.objects.filter(ids=video['id']['videoId'])
+        if video_in_db.exists:
+            return
+
+
         SearchResults.objects.create(ids=video['id']['videoId'],
                                      published_datetime=video['snippet']['publishedAt'],
                                      title=video['snippet']['title'],
