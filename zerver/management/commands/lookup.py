@@ -41,8 +41,8 @@ def save_youtube_videos(new_video):
     for video in new_video['items']:
 
         video_in_db = SearchResults.objects.filter(ids=video['id']['videoId'])
-        if video_in_db.exists:
-            return
+        if video_in_db.exists():
+            continue
 
 
         SearchResults.objects.create(ids=video['id']['videoId'],
@@ -80,7 +80,9 @@ class Command(BaseCommand):
                                                 published_after_str,
                                                 next_page)
 
-                    save_youtube_videos(new_videos)
+                    num_videos = len(new_videos['items'])
+                    if num_videos > 0:
+                        save_youtube_videos(new_videos)
 
 
                     if 'nextPageToken' in new_videos:
