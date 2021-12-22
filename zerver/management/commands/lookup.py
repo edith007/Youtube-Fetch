@@ -10,46 +10,56 @@ from googleapiclient.errors import HttpError
 from zerver.models import SearchResults
 
 
-DEVELOPER_KEY = os.environ['YOUTUBE_API_KEY']
-YOUTUBE_API_SERVICE_NAME = 'youtube'
-YOUTUBE_API_VERSION = 'v3'
-SYNC_INTERVAL = int(os.environ['SYNC_INTERVAL'] if 'SYNC_INTERVAL' in os.environ else 10)
+DEVELOPER_KEY = os.environ["YOUTUBE_API_KEY"]
+YOUTUBE_API_SERVICE_NAME = "youtube"
+YOUTUBE_API_VERSION = "v3"
+SYNC_INTERVAL = int(
+    os.environ["SYNC_INTERVAL"] if "SYNC_INTERVAL" in os.environ else 10
+)
 
 
 def lookup(query, result, published_time, page_token=None):
     """Search Queries in youtube and return result"""
 
-    youtube = build(YOUTUBE_API_SERVICE_NAME, YOUTUBE_API_VERSION, developerKey=DEVELOPER_KEY)
+    youtube = build(
+        YOUTUBE_API_SERVICE_NAME, YOUTUBE_API_VERSION, developerKey=DEVELOPER_KEY
+    )
 
     try:
-        search = youtube.search().list(
-            q=query,
-            type='video',
-            order='date',
-            part='id,snippet',
-            publishedAfter=published_time,
-            pageToken=page_token,
-            maxResults=result
-        ).execute()
+        search = (
+            youtube.search()
+            .list(
+                q=query,
+                type="video",
+                order="date",
+                part="id,snippet",
+                publishedAfter=published_time,
+                pageToken=page_token,
+                maxResults=result,
+            )
+            .execute()
+        )
         return search
     except HttpError as e:
         raise e
 
+
 def save_youtube_videos(new_video):
     """Save Youtube videos to database"""
 
-    for video in new_video['items']:
+    for video in new_video["items"]:
 
-        video_in_db = SearchResults.objects.filter(ids=video['id']['videoId'])
+        video_in_db = SearchResults.objects.filter(ids=video["id"]["videoId"])
         if video_in_db.exists():
             continue
 
-
-        SearchResults.objects.create(ids=video['id']['videoId'],
-                                     published_datetime=video['snippet']['publishedAt'],
-                                     title=video['snippet']['title'],
-                                     description=video['snippet']['description'],
-                                     thumbnail_url=video['snippet']['thumbnails']['medium']['url'])
+        SearchResults.objects.create(
+            ids=video["id"]["videoId"],
+            published_datetime=video["snippet"]["publishedAt"],
+            title=video["snippet"]["title"],
+            description=video["snippet"]["description"],
+            thumbnail_url=video["snippet"]["thumbnails"]["medium"]["url"],
+        )
 
 
 class Command(BaseCommand):
@@ -57,48 +67,47 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         """Handle the command"""
-        self.stdout.write('Sync Service Started...')
+        self.stdout.write("Sync Service Started...")
 
         while True:
-            
+
             try:
-                videos = SearchResults.objects.all().order_by('-published_datetime')
+                videos = SearchResults.objects.all().order_by("-published_datetime")
                 if videos.exists():
                     published_time = videos.first().published_datetime.replace(
-                        tzinfo=None)
+                        tzinfo=None
+                    )
                 else:
-                    published_time = datetime.datetime.utcnow() - \
-                                    datetime.timedelta(minutes=30)
+                    published_time = datetime.datetime.utcnow() - datetime.timedelta(
+                        minutes=30
+                    )
 
                 next_page = None
                 published_after_str = published_time.isoformat("T") + "Z"
 
                 while True:
 
-                    new_videos = lookup('football',
-                                                50,
-                                                published_after_str,
-                                                next_page)
+                    new_videos = lookup("football", 50, published_after_str, next_page)
 
-                    num_videos = len(new_videos['items'])
+                    num_videos = len(new_videos["items"])
                     if num_videos > 0:
                         save_youtube_videos(new_videos)
 
-
-                    if 'nextPageToken' in new_videos:
-                        next_page = new_videos['nextPageToken']
+                    if "nextPageToken" in new_videos:
+                        next_page = new_videos["nextPageToken"]
                     else:
                         break
-                self.stdout.write("Sync Completed successfully at {}".format(
-                    datetime.datetime.utcnow()
-                ))
+                self.stdout.write(
+                    "Sync Completed successfully at {}".format(
+                        datetime.datetime.utcnow()
+                    )
+                )
             except HttpError as e:
-                if e.resp['status'] == '403':
+                if e.resp["status"] == "403":
                     self.stdout.write("API error")
                     break
                 else:
                     self.stderr.write("Error calling API")
             finally:
 
-            
                 sleep(SYNC_INTERVAL)
