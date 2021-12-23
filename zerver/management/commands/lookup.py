@@ -6,11 +6,11 @@ from time import sleep
 from django.core.management.base import BaseCommand
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
+from uritemplate import api
 
 from zerver.models import SearchResults
+from backend_apis.models import Backend_apis
 
-
-DEVELOPER_KEY = os.environ["YOUTUBE_API_KEY"]
 YOUTUBE_API_SERVICE_NAME = "youtube"
 YOUTUBE_API_VERSION = "v3"
 SYNC_INTERVAL = int(
@@ -18,11 +18,11 @@ SYNC_INTERVAL = int(
 )
 
 
-def lookup(query, result, published_time, page_token=None):
+def lookup(backend_api, query, result, published_time, page_token=None):
     """Search Queries in youtube and return result"""
 
     youtube = build(
-        YOUTUBE_API_SERVICE_NAME, YOUTUBE_API_VERSION, developerKey=DEVELOPER_KEY
+        YOUTUBE_API_SERVICE_NAME, YOUTUBE_API_VERSION, developerKey=backend_api
     )
 
     try:
@@ -69,6 +69,10 @@ class Command(BaseCommand):
         """Handle the command"""
         self.stdout.write("Sync Service Started...")
 
+        api_keys = Backend_apis.objects.all()
+        current_api = api_keys.first().key if api_keys.exists() else "random"
+        current_api_number = 0
+
         while True:
 
             try:
@@ -87,7 +91,9 @@ class Command(BaseCommand):
 
                 while True:
 
-                    new_videos = lookup("football", 50, published_after_str, next_page)
+                    new_videos = lookup(
+                        current_api, "football", 50, published_after_str, next_page
+                    )
 
                     num_videos = len(new_videos["items"])
                     if num_videos > 0:
@@ -103,9 +109,18 @@ class Command(BaseCommand):
                     )
                 )
             except HttpError as e:
+                api_keys = Backend_apis.objects.all()
+                if not api_keys.exists():
+                    self.stdout.write("You don't have any existed API. Please add some")
+                    break
                 if e.resp["status"] == "403":
                     self.stdout.write("API error")
-                    break
+                    current_api_number = (current_api_number + 1) % api_keys.count()
+                    current_api = api_keys[current_api_number].key
+                    if current_api_number ==  api_keys.count() - 1:
+                        break
+                    else:
+                        continue
                 else:
                     self.stderr.write("Error calling API")
             finally:
