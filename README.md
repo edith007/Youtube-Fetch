@@ -1,5 +1,4 @@
-# Backend Assignment -Extern
-
+# Youtube-Fetch
 API to fetch latest videos sorted in reverse chronological order of their publishing
 date-time from YouTube for a given tag/search query in a paginated response.
 
@@ -7,7 +6,11 @@ date-time from YouTube for a given tag/search query in a paginated response.
 - Dashboard `http://127.0.0.1:8000/admin/` to access the sync data.
 - Implement a GET API which returns the stored video data in a paginated response sorted in decending
   order of published datetime.
-- The API will give 50 results on every query.  To view next ones, use `http://127.0.0.1:8000/videos/?page=2`
+- User can see videos from database available as REST-API at `<base_url>/videos`.
+- The API will give 50 results on every query.  To view next ones, use `<base_url>/videos?page=page_number`
+- Admin Dashboard to view all videos in database
+- User Can add Multiple Youtube-API keys in Admin Dashboard, so that if quota is exhausted on one, it
+  automatically uses the next available key.
 
 
 ## Getting started
@@ -22,7 +25,7 @@ date-time from YouTube for a given tag/search query in a paginated response.
 
 ### Using Docker
 
-- Add `YOUTUBE_API_KEY` in `.env`.
+- Add `YOUTUBE_API_KEY` in Admin Dashboard
 - Run `docker-compose up`
 
 ### Building from source
@@ -34,7 +37,7 @@ date-time from YouTube for a given tag/search query in a paginated response.
     `python3 -m venv env`
 - Install the dependencies
     `pip install -r requirements.txt`
-- Add `YOUTUBE_API_KEY` in `.env`.
+- Add `YOUTUBE_API_KEY` in Admin Dashboard.
 - After the dependencies are install run the migration using command
     `python3 manage.py makemigrations && python3 manage.py migrate`
 - Start the server through the following command
